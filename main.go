@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -189,6 +190,9 @@ func checkData(kode string, kota *string) {
 }
 
 func logError(fileName, message, wilayah, url string) {
+	url = strings.TrimPrefix(url, "https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp")
+	url = strings.TrimSuffix(url, ".json")
+	url = "https://pemilu2024.kpu.go.id/pilpres/hitung-suara" + url
 	fileContent := map[string]string{"message": message, "link": url, "wilayah": wilayah}
 	fileBytes, err := json.Marshal(fileContent)
 	if err != nil {

@@ -4,9 +4,9 @@ Untuk membangun file `main.go` dengan nama kustom, gunakan perintah `go build` d
 
 Untuk sistem operasi Windows:
 ```bash
-go build -o nama_kustom.exe .\main.go
+go build -o pemilucheck.exe .\main.go
 ```
 Untuk sistem operasi lain seperti Linux atau macOS:
 ```bash
-go build -o nama_kustom ./main.go
+go build -o pemilucheck ./main.go
 ```
