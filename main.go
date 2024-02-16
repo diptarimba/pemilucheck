@@ -154,7 +154,6 @@ func fetchData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 func checkData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 	var addPath string
 	defer wg.Done()
-	fmt.Println("masuk")
 
 	var dataRes DataPemilu
 
