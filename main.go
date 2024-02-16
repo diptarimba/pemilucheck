@@ -132,35 +132,8 @@ func fetchData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 	for _, each := range dataRes {
 		kotaBaru := kotaNama + "-" + each.Nama
 		pathTemp := addPath + "/" + each.Kode
-		// if each.Tingkat < 5 {
-		// 	pathTemp := addPath + "/" + each.Kode
-		// 	// go fetchData(&pathTemp, &kotaBaru, wg)
-		// 	sem <- struct{}{}
-		// 	wg.Add(1)
-		// 	go func() {
-		// 		defer func() {
-		// 			<-sem
-		// 			wg.Done()
-		// 		}()
-		// 		fetchData(&pathTemp, &kotaBaru, wg)
-		// 	}()
-
-		// } else {
-		// 	pathTemp := addPath + "/" + each.Kode
-		// 	// go checkData(&pathTemp, &kotaBaru, wg)
-		// 	sem <- struct{}{}
-		// 	wg.Add(1)
-		// 	go func() {
-		// 		defer func() {
-		// 			<-sem
-		// 			wg.Done()
-		// 		}()
-		// 		fetchData(&pathTemp, &kotaBaru, wg)
-		// 	}()
-		// }
 
 		wg.Add(1) // Tambahkan wg.Add(1) sebelum goroutine dijalankan
-		// Ambil slot semaphore
 
 		go func(each WilayahPemiluSatuan, pathTemp string, kotaBaru string) {
 			sem <- struct{}{}
@@ -171,17 +144,13 @@ func fetchData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 			if each.Tingkat < 5 {
 				fetchData(&pathTemp, &kotaBaru, wg)
 			} else {
-				// checkData(&pathTemp, &kotaBaru)
 				checkData(&pathTemp, &kotaBaru, wg)
 			}
-			// fmt.Println("selesai")
 		}(each, pathTemp, kotaBaru)
 
-		// wg.Wait()
 	}
 }
 
-// func checkData(addPathParam *string, kota *string) {
 func checkData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 	var addPath string
 	defer wg.Done()
@@ -224,16 +193,12 @@ func checkData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 	if dataRes.Administrasi == nil {
 		log.Println("Data belum tersedia, link : " + url)
 		logError("unavailable.txt", "Data belum tersedia", *kota, url)
-		// go func() {
-		// }()
 		return
 	}
 
 	if dataRes.Chart == nil {
 		log.Println("Data belum tersedia v2, link : " + url)
 		logError("unavailablev2.txt", "Data Aneh", *kota, url)
-		// go func() {
-		// }()
 		return
 	}
 	total := dataRes.Chart.Num100025 + dataRes.Chart.Num100026 + dataRes.Chart.Num100027
@@ -244,15 +209,11 @@ func checkData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
 	if total != dataRes.Administrasi.SuaraSah {
 		log.Println("Perhitungan Tidak Sesuai, link : " + url)
 		logError("invalid.txt", dataToSave, *kota, url)
-		// go func() {
-		// }()
 		return
 	}
 
 	log.Println("Perhitungan Sesuai, link : " + url)
 	logError("valid.txt", "Perhitungan Sesuai", *kota, url)
-	// go func() {
-	// }()
 	return
 
 }
