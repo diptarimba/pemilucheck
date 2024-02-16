@@ -9,15 +9,15 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
+	"sync"
 )
 
 var baseUrl = "https://sirekap-obj-data.kpu.go.id/wilayah/pemilu/ppwp%s.json"
 var baseUrlCekData = "https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp%s.json"
-var addPath = ""
-var kotaNama = ""
 
-type WilayahPemilu []struct {
+type WilayahPemilu []WilayahPemiluSatuan
+
+type WilayahPemiluSatuan struct {
 	Nama    string `json:"nama"`
 	ID      int    `json:"id"`
 	Kode    string `json:"kode"`
@@ -72,25 +72,36 @@ var headerHttp = map[string]string{
 	"User-Agent":      "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1 Edg/121.0.0.0",
 }
 
+var sem = make(chan struct{}, 10)
+
 func main() {
-	fetchData("", nil)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	fetchData(nil, nil, &wg)
+	wg.Wait()
 }
 
-func fetchData(id string, kota *string) {
+func fetchData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
+	var addPath = "/0"
+	if addPathParam != nil {
+		if addPath[0:2] == "/0" {
+			addPath = strings.Replace(*addPathParam, "/0", "", 1)
+		} else {
+			addPath = *addPathParam
+		}
+	}
+	var kotaNama = ""
+	if kota != nil {
+		kotaNama = *kota
+	}
+	defer wg.Done()
 
 	var dataRes WilayahPemilu
-	if id == "" {
-		id = "0"
-	}
-	if addPath == "/0" {
-		addPath = ""
-	}
-	addPath += "/" + id
 	url := fmt.Sprintf(baseUrl, addPath)
-
+	fmt.Println(url)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(url, err)
 		return
 	}
 
@@ -101,41 +112,84 @@ func fetchData(id string, kota *string) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(url, err)
 		return
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(url, err)
 		return
 	}
 
 	err = json.Unmarshal(body, &dataRes)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(url, err)
 		return
 	}
 
 	for _, each := range dataRes {
-		kotaNama += "-" + each.Nama
-		if each.Tingkat < 5 {
-			fetchData(each.Kode, &kotaNama)
-		} else {
-			checkData(each.Kode, &kotaNama)
-			addPath = addPath[:len(addPath)-len(each.Kode)-1]
-		}
-		kotaNama = kotaNama[:len(kotaNama)-len(each.Nama)-1]
-		time.Sleep(500 * time.Millisecond)
+		kotaBaru := kotaNama + "-" + each.Nama
+		pathTemp := addPath + "/" + each.Kode
+		// if each.Tingkat < 5 {
+		// 	pathTemp := addPath + "/" + each.Kode
+		// 	// go fetchData(&pathTemp, &kotaBaru, wg)
+		// 	sem <- struct{}{}
+		// 	wg.Add(1)
+		// 	go func() {
+		// 		defer func() {
+		// 			<-sem
+		// 			wg.Done()
+		// 		}()
+		// 		fetchData(&pathTemp, &kotaBaru, wg)
+		// 	}()
+
+		// } else {
+		// 	pathTemp := addPath + "/" + each.Kode
+		// 	// go checkData(&pathTemp, &kotaBaru, wg)
+		// 	sem <- struct{}{}
+		// 	wg.Add(1)
+		// 	go func() {
+		// 		defer func() {
+		// 			<-sem
+		// 			wg.Done()
+		// 		}()
+		// 		fetchData(&pathTemp, &kotaBaru, wg)
+		// 	}()
+		// }
+
+		wg.Add(1) // Tambahkan wg.Add(1) sebelum goroutine dijalankan
+		// Ambil slot semaphore
+
+		go func(each WilayahPemiluSatuan, pathTemp string, kotaBaru string) {
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
+			if each.Tingkat < 5 {
+				fetchData(&pathTemp, &kotaBaru, wg)
+			} else {
+				// checkData(&pathTemp, &kotaBaru)
+				checkData(&pathTemp, &kotaBaru, wg)
+			}
+			// fmt.Println("selesai")
+		}(each, pathTemp, kotaBaru)
+
+		// wg.Wait()
 	}
-	addPath = addPath[:len(addPath)-len(id)-1]
 }
 
-func checkData(kode string, kota *string) {
+// func checkData(addPathParam *string, kota *string) {
+func checkData(addPathParam *string, kota *string, wg *sync.WaitGroup) {
+	var addPath string
+	defer wg.Done()
+	fmt.Println("masuk")
+
 	var dataRes DataPemilu
 
-	addPath += "/" + kode
+	addPath = *addPathParam
 	url := fmt.Sprintf(baseUrlCekData, addPath)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -170,12 +224,16 @@ func checkData(kode string, kota *string) {
 	if dataRes.Administrasi == nil {
 		log.Println("Data belum tersedia, link : " + url)
 		logError("unavailable.txt", "Data belum tersedia", *kota, url)
+		// go func() {
+		// }()
 		return
 	}
 
 	if dataRes.Chart == nil {
 		log.Println("Data belum tersedia v2, link : " + url)
 		logError("unavailablev2.txt", "Data Aneh", *kota, url)
+		// go func() {
+		// }()
 		return
 	}
 	total := dataRes.Chart.Num100025 + dataRes.Chart.Num100026 + dataRes.Chart.Num100027
@@ -186,11 +244,17 @@ func checkData(kode string, kota *string) {
 	if total != dataRes.Administrasi.SuaraSah {
 		log.Println("Perhitungan Tidak Sesuai, link : " + url)
 		logError("invalid.txt", dataToSave, *kota, url)
+		// go func() {
+		// }()
 		return
 	}
 
 	log.Println("Perhitungan Sesuai, link : " + url)
 	logError("valid.txt", "Perhitungan Sesuai", *kota, url)
+	// go func() {
+	// }()
+	return
+
 }
 
 func logError(fileName, message, wilayah, url string) {
