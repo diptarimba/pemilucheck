@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -120,7 +121,6 @@ func fetchData(id string, kota *string) {
 	for _, each := range dataRes {
 		kotaNama += "-" + each.Nama
 		if each.Tingkat < 5 {
-
 			fetchData(each.Kode, &kotaNama)
 		} else {
 			checkData(each.Kode, &kotaNama)
@@ -179,9 +179,13 @@ func checkData(kode string, kota *string) {
 		return
 	}
 	total := dataRes.Chart.Num100025 + dataRes.Chart.Num100026 + dataRes.Chart.Num100027
+	rawSelisih := total - dataRes.Administrasi.SuaraSah
+	selisih := int(math.Abs(float64(rawSelisih)))
+	dataToSave := fmt.Sprintf("Anis: %d, Prabowo: %d, Ganjar: %d, Total 3 Paslon: %d, Total Sah: %d, Selisih: %d, Wilayah: %s, Keterangan: %s", dataRes.Chart.Num100025, dataRes.Chart.Num100026, dataRes.Chart.Num100027, total, dataRes.Administrasi.SuaraSah, selisih, *kota, "Data Tidak Sesuai")
+
 	if total != dataRes.Administrasi.SuaraSah {
 		log.Println("Perhitungan Tidak Sesuai, link : " + url)
-		logError("invalid.txt", "Perhitungan Tidak Sesuai", *kota, url)
+		logError("invalid.txt", dataToSave, *kota, url)
 		return
 	}
 
